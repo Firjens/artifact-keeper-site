@@ -1,0 +1,381 @@
+---
+title: "Protobuf / BSR Guide"
+description: "Using Artifact Keeper as a Buf Schema Registry compatible protobuf module host"
+---
+
+Artifact Keeper provides a Buf Schema Registry (BSR) compatible endpoint for hosting and distributing protobuf modules. It implements the Connect RPC protocol used by the `buf` CLI.
+
+## Endpoint
+
+Protobuf operations use the `/proto/{repo_key}` endpoint:
+
+```
+http://localhost:8080/proto/my-protobuf-repo
+```
+
+This implements the BSR Connect RPC services: `ModuleService`, `CommitService`, `UploadService`, `DownloadService`, `LabelService`, `GraphService`, and `ResourceService`.
+
+## Configuration
+
+### Create a Protobuf Repository
+
+Create a repository with the `protobuf` format:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/repositories \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "key": "protobuf-local",
+    "name": "Protobuf Modules",
+    "format": "protobuf",
+    "repo_type": "local",
+    "is_public": true
+  }'
+```
+
+### Configure buf CLI
+
+In your `buf.yaml`, point at your Artifact Keeper instance as the registry:
+
+```yaml
+version: v2
+name: buf.build/acme/payments
+deps: []
+```
+
+The `buf` CLI communicates using Connect RPC over HTTP. Set the `BUF_TOKEN` environment variable for authentication:
+
+```bash
+export BUF_TOKEN="your-api-token-or-password"
+```
+
+## Publishing Modules
+
+### Push with buf CLI
+
+Push a module to Artifact Keeper:
+
+```bash
+buf push --registry http://localhost:8080/proto/protobuf-local
+```
+
+### Push via Connect RPC (curl)
+
+You can also push directly via the Upload endpoint:
+
+```bash
+# Base64-encode your proto file content
+PROTO_B64=$(base64 < acme/payments/v1/payments.proto | tr -d '\n')
+BUF_YAML_B64=$(base64 < buf.yaml | tr -d '\n')
+
+curl -X POST \
+  "http://localhost:8080/proto/protobuf-local/buf.registry.module.v1beta1.UploadService/Upload" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"contents\": [{
+      \"moduleRef\": {\"owner\": \"acme\", \"module\": \"payments\"},
+      \"files\": [
+        {\"path\": \"acme/payments/v1/payments.proto\", \"content\": \"$PROTO_B64\"},
+        {\"path\": \"buf.yaml\", \"content\": \"$BUF_YAML_B64\"}
+      ],
+      \"labelRefs\": [{\"name\": \"main\"}, {\"name\": \"v1.0.0\"}]
+    }]
+  }"
+```
+
+Each upload produces a **commit** identified by a SHA-256 digest computed from the file contents. Uploads are idempotent — pushing the same content again returns the same commit ID.
+
+### Labels
+
+Labels are mutable pointers to commits (similar to Git branches or tags). The `main` label is created automatically if no labels are specified during upload.
+
+Create or update labels:
+
+```bash
+curl -X POST \
+  "http://localhost:8080/proto/protobuf-local/buf.registry.module.v1.LabelService/CreateOrUpdateLabels" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "values": [{
+      "owner": "acme",
+      "module": "payments",
+      "name": "v2.0.0",
+      "commitId": "abc123..."
+    }]
+  }'
+```
+
+## Consuming Modules
+
+### Download via Connect RPC
+
+Pull a module by label:
+
+```bash
+curl -X POST \
+  "http://localhost:8080/proto/protobuf-local/buf.registry.module.v1beta1.DownloadService/Download" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "values": [{
+      "resourceRef": {
+        "owner": "acme",
+        "module": "payments",
+        "label": "v1.0.0"
+      }
+    }]
+  }'
+```
+
+The response includes all files in the module with base64-encoded content.
+
+### Dependency Resolution
+
+Specify dependencies in the upload request using `depRefs`:
+
+```json
+{
+  "contents": [{
+    "moduleRef": {"owner": "acme", "module": "orders"},
+    "files": [...],
+    "depRefs": [
+      {"owner": "acme", "module": "payments"},
+      {"owner": "acme", "module": "common"}
+    ]
+  }]
+}
+```
+
+Dependencies are tracked in artifact metadata and surfaced through the Graph endpoint.
+
+### Dependency Graph
+
+Query the dependency graph for a module:
+
+```bash
+curl -X POST \
+  "http://localhost:8080/proto/protobuf-local/buf.registry.module.v1.GraphService/GetGraph" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resourceRefs": [{
+      "owner": "acme",
+      "module": "orders",
+      "label": "main"
+    }]
+  }'
+```
+
+Returns commits and edges representing the dependency relationships.
+
+## Querying Modules
+
+### List Modules
+
+```bash
+curl -X POST \
+  "http://localhost:8080/proto/protobuf-local/buf.registry.module.v1.ModuleService/GetModules" \
+  -H "Content-Type: application/json" \
+  -d '{"moduleRefs": [{"owner": "acme", "module": "payments"}]}'
+```
+
+### List Commits
+
+Paginated commit history for a module:
+
+```bash
+curl -X POST \
+  "http://localhost:8080/proto/protobuf-local/buf.registry.module.v1.CommitService/ListCommits" \
+  -H "Content-Type: application/json" \
+  -d '{"owner": "acme", "module": "payments", "pageSize": 25}'
+```
+
+### Resolve Resources
+
+Combined module + commit resolution in one call:
+
+```bash
+curl -X POST \
+  "http://localhost:8080/proto/protobuf-local/buf.registry.module.v1.ResourceService/GetResources" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "resourceRefs": [{
+      "owner": "acme",
+      "module": "payments",
+      "label": "main"
+    }]
+  }'
+```
+
+## Repository Types
+
+### Local
+
+Stores modules directly. Supports both reads and writes.
+
+```json
+{"repo_type": "local"}
+```
+
+### Remote (Proxy)
+
+Proxies requests to an upstream BSR instance. Read-only — uploads are rejected with `405`.
+
+```json
+{
+  "repo_type": "remote",
+  "upstream_url": "https://buf.build"
+}
+```
+
+### Virtual
+
+Routes requests to member repositories in priority order. Supports both local and remote backends.
+
+```json
+{"repo_type": "virtual"}
+```
+
+## Connect RPC API Reference
+
+All endpoints accept and return JSON with `Content-Type: application/json`.
+
+| Service | Method | Auth Required |
+|---------|--------|---------------|
+| `ModuleService` | `GetModules` | No |
+| `ModuleService` | `CreateModules` | Yes |
+| `CommitService` | `GetCommits` | No |
+| `CommitService` | `ListCommits` | No |
+| `UploadService` | `Upload` | Yes |
+| `DownloadService` | `Download` | No |
+| `LabelService` | `GetLabels` | No |
+| `LabelService` | `CreateOrUpdateLabels` | Yes |
+| `GraphService` | `GetGraph` | No |
+| `ResourceService` | `GetResources` | No |
+
+Authentication supports both Basic auth (`username:password`) and Bearer tokens (API keys).
+
+## Integration with CI/CD
+
+### GitHub Actions
+
+```yaml
+name: Push Protobuf Modules
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: 'latest'
+
+      - name: Push to Artifact Keeper
+        env:
+          BUF_TOKEN: ${{ secrets.ARTIFACT_KEEPER_TOKEN }}
+        run: |
+          buf push --registry ${{ vars.REGISTRY_URL }}/proto/protobuf-local
+```
+
+### GitLab CI
+
+```yaml
+publish-protos:
+  image: bufbuild/buf:latest
+  stage: deploy
+  script:
+    - buf push --registry ${REGISTRY_URL}/proto/protobuf-local
+  variables:
+    BUF_TOKEN: ${ARTIFACT_KEEPER_TOKEN}
+  only:
+    - tags
+```
+
+## Migration from Buf Schema Registry
+
+To migrate modules from the public BSR to a self-hosted Artifact Keeper instance:
+
+1. **Create a remote repository** pointing at `buf.build`:
+   ```bash
+   curl -X POST http://localhost:8080/api/v1/repositories \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "key": "buf-remote",
+       "format": "protobuf",
+       "repo_type": "remote",
+       "upstream_url": "https://buf.build"
+     }'
+   ```
+
+2. **Create a local repository** for your own modules:
+   ```bash
+   curl -X POST http://localhost:8080/api/v1/repositories \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "key": "protobuf-local",
+       "format": "protobuf",
+       "repo_type": "local"
+     }'
+   ```
+
+3. **Create a virtual repository** that combines both:
+   ```bash
+   curl -X POST http://localhost:8080/api/v1/repositories \
+     -H "Authorization: Bearer $TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "key": "protobuf",
+       "format": "protobuf",
+       "repo_type": "virtual"
+     }'
+   ```
+
+4. **Point your `buf` CLI** at the virtual repository and your modules resolve from local first, falling back to the upstream BSR.
+
+## Troubleshooting
+
+### Upload Rejected (405)
+
+Write operations are only allowed on `local` repositories. Verify your repository type:
+
+```bash
+curl http://localhost:8080/api/v1/repositories/protobuf-local
+```
+
+### Module Not Found
+
+Check that the owner/module names match exactly:
+
+```bash
+curl -X POST \
+  "http://localhost:8080/proto/protobuf-local/buf.registry.module.v1.ModuleService/GetModules" \
+  -H "Content-Type: application/json" \
+  -d '{"moduleRefs": [{"owner": "acme", "module": "payments"}]}'
+```
+
+### Authentication Errors
+
+Verify your token is valid:
+
+```bash
+# Using Bearer token
+curl -H "Authorization: Bearer $TOKEN" ...
+
+# Using Basic auth
+curl -u "admin:password" ...
+```
+
+## See Also
+
+- [Security Scanning](/docs/security/scanning/) — Vulnerability scanning for dependencies
+- [Peer Replication](/docs/advanced/peer-replication/) — Replicate modules across instances
+- [Security Policies](/docs/security/policies/) — Block modules based on quality gates

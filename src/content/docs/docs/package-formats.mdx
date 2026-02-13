@@ -13,7 +13,7 @@ This page is a quick reference index. Click through to the detailed guide pages 
 
 ## Complete Format Reference
 
-**35 native formats** with full wire-protocol support, plus **17 aliases** for alternative clients that share an underlying protocol. Custom formats can be added at any time via [WASM plugins](/docs/advanced/plugins/).
+**36 native formats** with full wire-protocol support, plus **17 aliases** for alternative clients that share an underlying protocol. Custom formats can be added at any time via [WASM plugins](/docs/advanced/plugins/).
 
 | # | Format | Key | Category | Native Clients |
 |---|--------|-----|----------|----------------|
@@ -32,26 +32,27 @@ This page is a quick reference index. Click through to the detailed guide pages 
 | 13 | CRAN | `cran` | Languages | R, install.packages |
 | 14 | SBT | `sbt` | Languages | sbt, Ivy |
 | 15 | Conda | `conda_native` | Languages | conda, mamba, micromamba |
-| 16 | Docker / OCI | `docker` | Containers | Docker, Podman, Buildx, ORAS |
-| 17 | Helm | `helm` | Infrastructure | helm |
-| 18 | Terraform | `terraform` | Infrastructure | terraform, tofu |
-| 19 | Vagrant | `vagrant` | Infrastructure | vagrant |
-| 20 | Chef | `chef` | Infrastructure | knife, Berkshelf |
-| 21 | Puppet | `puppet` | Infrastructure | puppet module |
-| 22 | Ansible | `ansible` | Infrastructure | ansible-galaxy |
-| 23 | Debian / APT | `debian` | System Packages | apt, dpkg |
-| 24 | RPM / YUM | `rpm` | System Packages | yum, dnf, zypper |
-| 25 | Alpine / APK | `alpine` | System Packages | apk |
-| 26 | OPKG | `opkg` | System Packages | opkg (OpenWrt) |
-| 27 | Conan | `conan` | C / C++ | conan (v2) |
-| 28 | Bazel | `bazel` | C / C++ | bazel, bazelisk |
-| 29 | HuggingFace | `huggingface` | ML / AI | huggingface_hub, transformers |
-| 30 | ML Model | `mlmodel` | ML / AI | Generic model storage |
-| 31 | VS Code | `vscode` | Editor Extensions | VS Code, Cursor, Windsurf, Kiro |
-| 32 | JetBrains | `jetbrains` | Editor Extensions | IntelliJ, PyCharm, WebStorm |
-| 33 | Git LFS | `gitlfs` | Other | git lfs |
-| 34 | P2 | `p2` | Other | Eclipse IDE |
-| 35 | Generic | `generic` | Other | curl, wget, any HTTP client |
+| 16 | Protobuf / BSR | `protobuf` | Schemas | buf CLI |
+| 17 | Docker / OCI | `docker` | Containers | Docker, Podman, Buildx, ORAS |
+| 18 | Helm | `helm` | Infrastructure | helm |
+| 19 | Terraform | `terraform` | Infrastructure | terraform, tofu |
+| 20 | Vagrant | `vagrant` | Infrastructure | vagrant |
+| 21 | Chef | `chef` | Infrastructure | knife, Berkshelf |
+| 22 | Puppet | `puppet` | Infrastructure | puppet module |
+| 23 | Ansible | `ansible` | Infrastructure | ansible-galaxy |
+| 24 | Debian / APT | `debian` | System Packages | apt, dpkg |
+| 25 | RPM / YUM | `rpm` | System Packages | yum, dnf, zypper |
+| 26 | Alpine / APK | `alpine` | System Packages | apk |
+| 27 | OPKG | `opkg` | System Packages | opkg (OpenWrt) |
+| 28 | Conan | `conan` | C / C++ | conan (v2) |
+| 29 | Bazel | `bazel` | C / C++ | bazel, bazelisk |
+| 30 | HuggingFace | `huggingface` | ML / AI | huggingface_hub, transformers |
+| 31 | ML Model | `mlmodel` | ML / AI | Generic model storage |
+| 32 | VS Code | `vscode` | Editor Extensions | VS Code, Cursor, Windsurf, Kiro |
+| 33 | JetBrains | `jetbrains` | Editor Extensions | IntelliJ, PyCharm, WebStorm |
+| 34 | Git LFS | `gitlfs` | Other | git lfs |
+| 35 | P2 | `p2` | Other | Eclipse IDE |
+| 36 | Generic | `generic` | Other | curl, wget, any HTTP client |
 
 ---
 
@@ -76,6 +77,16 @@ This page is a quick reference index. Click through to the detailed guide pages 
 | **Swift** | `swift` | Swift Package Manager | [More Languages](/docs/guides/more-languages/) |
 | **CocoaPods** | `cocoapods` | pod | [More Languages](/docs/guides/more-languages/) |
 | **CRAN** | `cran` | R, install.packages | [More Languages](/docs/guides/more-languages/) |
+
+---
+
+## Schemas
+
+| Format | Key | Native Clients | Guide |
+|--------|-----|----------------|-------|
+| **Protobuf / BSR** | `protobuf` | buf CLI | [Protobuf / BSR Guide](/docs/guides/protobuf/) |
+
+BSR-compatible Connect RPC endpoints for hosting protobuf modules with commit tracking, labels, and dependency graphs.
 
 ---
 
