@@ -45,6 +45,7 @@ export default defineConfig({
             { label: 'RubyGems', slug: 'docs/guides/rubygems' },
             { label: 'Composer / PHP', slug: 'docs/guides/composer' },
             { label: 'Helm', slug: 'docs/guides/helm' },
+            { label: 'Protobuf / BSR', slug: 'docs/guides/protobuf' },
             { label: 'C / C++', slug: 'docs/guides/cpp' },
             { label: 'System Packages', slug: 'docs/guides/system-packages' },
             { label: 'Infrastructure', slug: 'docs/guides/infrastructure' },
