@@ -1,0 +1,101 @@
+---
+title: "Container Hardening"
+description: "STIG-approved Red Hat UBI base images, non-root execution, and minimal attack surface"
+---
+
+All Artifact Keeper container images are built on [Red Hat Universal Base Images (UBI) 9.5](https://catalog.redhat.com/software/base-images), which meet [DISA STIG](https://www.cyber.mil/stigs/) requirements for deployment in regulated and high-security environments.
+
+## Base Images
+
+Every production image uses official Red Hat UBI 9.5 variants from `registry.access.redhat.com`:
+
+| Image | Base | Purpose |
+|-------|------|---------|
+| **Backend** (artifact-keeper-backend) | `ubi9/ubi-micro:9.5` | API server runtime |
+| **OpenSCAP** (artifact-keeper-openscap) | `ubi9/ubi-micro:9.5` | Compliance scanning sidecar |
+
+Build stages use `ubi9/ubi:9.5` (full) and `ubi9/ubi-minimal:9.5` for compilation and tooling, but the final runtime images use **ubi-micro** — the smallest UBI variant with no package manager, shell, or unnecessary utilities.
+
+## Why UBI 9
+
+Red Hat UBI images are:
+
+- **STIG-approved** — Meet [DISA Security Technical Implementation Guide](https://www.cyber.mil/stigs/) requirements, approved for use in DoD and federal environments
+- **RHEL-based** — Same packages, same security patches, same lifecycle as Red Hat Enterprise Linux 9
+- **CVE-patched** — Red Hat publishes security errata with SLA-backed response times
+- **FIPS-capable** — UBI 9 supports FIPS 140-2/140-3 validated cryptographic modules when running on a FIPS-enabled RHEL host
+- **Freely redistributable** — No subscription required to pull or redistribute UBI images
+
+## Multi-Stage Build
+
+Both the backend and OpenSCAP images use multi-stage Docker builds to minimize the final image:
+
+```text
+Stage 1: ubi9/ubi:9.5          — Compile Rust backend (build tools, dev headers)
+Stage 2: ubi9/ubi:9.5          — Assemble minimal rootfs (runtime libs only)
+Stage 3: ubi9/ubi-minimal:9.5  — Install scanner CLIs (Trivy, Grype)
+Stage 4: ubi9/ubi-micro:9.5    — Final image (copy binary + rootfs + scanners)
+```
+
+The final runtime image contains only:
+
+- The compiled binary
+- Minimal runtime libraries (glibc, openssl-libs, zlib, ca-certificates)
+- Scanner CLIs (Trivy, Grype) — backend image only
+- No shell, no package manager, no build tools
+
+## Non-Root Execution
+
+All containers run as non-root users:
+
+| Container | User | UID:GID |
+|-----------|------|---------|
+| Backend | `artifact` | 1001:0 |
+| OpenSCAP | `oscap` | 1001:0 |
+
+GID 0 (root group) is used following the [OpenShift best practice](https://docs.openshift.com/container-platform/latest/openshift_images/create-images.html#use-uid_create-images) for arbitrary UID support, while the process itself has no root privileges.
+
+## Security Properties
+
+| Property | Status |
+|----------|--------|
+| Non-root process | Yes (UID 1001) |
+| No package manager in runtime | Yes (ubi-micro) |
+| No shell in runtime | Yes (ubi-micro) |
+| Read-only rootfs compatible | Yes |
+| Signed base images | Yes (Red Hat signing key) |
+| CVE scanning by vendor | Yes (Red Hat Security Errata) |
+| STIG baseline | RHEL 9 STIG (via UBI 9) |
+| FIPS 140-2/140-3 capable | Yes (on FIPS-enabled host) |
+
+## Kubernetes Security Context
+
+When deploying on Kubernetes, apply a restrictive security context:
+
+```yaml
+# Helm values.yaml
+backend:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1001
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+```
+
+## Verifying the Base Image
+
+To confirm the image lineage:
+
+```bash
+# Inspect the backend image
+docker inspect ghcr.io/artifact-keeper/artifact-keeper-backend:latest \
+  --format '{{index .Config.Labels "io.openshift.base-image"}}'
+
+# Check the OS release inside the container
+docker run --rm --entrypoint="" \
+  ghcr.io/artifact-keeper/artifact-keeper-backend:latest \
+  cat /etc/redhat-release
+# → Red Hat Enterprise Linux release 9.5 (Plow)
+```

@@ -63,6 +63,7 @@ export default defineConfig({
             { label: 'Quality Gates', slug: 'docs/security/quality-gates' },
             { label: 'Security Policies', slug: 'docs/security/policies' },
             { label: 'Artifact Signing', slug: 'docs/security/signing' },
+            { label: 'Container Hardening', slug: 'docs/security/container-hardening' },
             { label: 'Security Testing', slug: 'docs/security/red-team' },
           ],
         },
