@@ -226,6 +226,56 @@ docker system df -v      # Check Docker disk usage
 docker system prune -a   # Clean unused images/containers
 ```
 
+### Meilisearch CrashLoopBackOff / Database Errors
+
+Meilisearch stores its data in a `data.ms` directory. When upgrading Meilisearch to a new major version, the database format may be incompatible with the previous version. Symptoms include:
+
+- Container starts, shows the banner, then immediately exits
+- CrashLoopBackOff in Kubernetes with hundreds of restarts
+- Log errors mentioning database version mismatch or corruption
+
+**Fix — Docker Compose:**
+
+```bash
+# 1. Export your search data first (if you have important custom indexes)
+# Meilisearch indexes are rebuilt from the backend on startup, so this is usually safe to skip.
+
+# 2. Stop Meilisearch and delete the volume
+docker compose down meilisearch
+docker volume rm artifact-keeper_meilisearch_data
+
+# 3. Restart — Meilisearch creates a fresh database, backend re-indexes automatically
+docker compose up -d
+```
+
+**Fix — Kubernetes:**
+
+```bash
+# 1. Delete the Meilisearch PVC (adjust namespace and name)
+kubectl delete pvc meilisearch-data -n <namespace>
+
+# 2. Delete the pod to trigger recreation with a fresh volume
+kubectl delete pod -n <namespace> -l app.kubernetes.io/component=meilisearch
+
+# 3. The backend re-indexes all artifacts into Meilisearch on reconnection
+```
+
+**Note:** Meilisearch search indexes are derived from PostgreSQL data. Deleting and recreating the Meilisearch volume is safe — the backend rebuilds the search index automatically. No artifact data is lost.
+
+### Meilisearch High Memory Usage
+
+Meilisearch spawns one worker per CPU core by default. On large machines this can exceed memory limits. Set `MEILI_MAX_INDEXING_THREADS` to limit worker count:
+
+```yaml
+# docker-compose.yml
+services:
+  meilisearch:
+    environment:
+      MEILI_MAX_INDEXING_THREADS: 4
+```
+
+For Kubernetes, add to the Meilisearch container environment in your Helm values or deployment spec.
+
 ## Production Checklist
 
 - [ ] Set strong `JWT_SECRET` (64+ characters)
