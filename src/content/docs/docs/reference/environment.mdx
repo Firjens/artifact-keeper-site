@@ -184,26 +184,9 @@ When `STORAGE_BACKEND=azure`. Read by the **backend** process.
 
 ## Lifecycle Policies (Garbage Collection)
 
-Artifact cleanup is managed through **lifecycle policies**, not environment variables. Policies are created and managed via the Admin API (`/api/v1/admin/lifecycle`) or the web UI.
+Artifact cleanup is managed through **lifecycle policies**, not environment variables. There is no `GC_RETENTION_DAYS` or similar setting. Policies are created and managed via the Admin API or the web UI, and execute automatically every 6 hours.
 
-The backend automatically executes all enabled policies every **6 hours** via a background scheduler. No environment variable is needed to enable this — any enabled policy will run automatically.
-
-**Available policy types:**
-
-| Type | Description |
-|------|-------------|
-| `max_age_days` | Delete artifacts older than N days |
-| `max_versions` | Keep only the latest N versions per package (per repo) |
-| `no_downloads_days` | Delete artifacts not downloaded in N days |
-| `tag_pattern_keep` | Keep artifacts matching a regex, delete the rest |
-| `tag_pattern_delete` | Delete artifacts matching a regex |
-| `size_quota_bytes` | Enforce per-repo storage quota (LRU eviction) |
-
-Each policy supports **dry-run** mode (`POST /api/v1/admin/lifecycle/{id}/preview`) to see what would be affected before executing.
-
-:::note
-There is no `GC_RETENTION_DAYS` environment variable. All cleanup behavior is configured through lifecycle policies in the database, giving you per-repository granularity and multiple policy types.
-:::
+See the dedicated [Lifecycle Policies](/docs/advanced/lifecycle) page for full documentation, including policy types, configuration examples, dry-run previews, and scheduling details.
 
 ## Peer Replication
 
