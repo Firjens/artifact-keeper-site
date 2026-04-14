@@ -262,8 +262,9 @@ Read by the **backend** process.
 |----------|----------|---------|-------------|
 | `METRICS_ENABLED` | No | `true` | Enable Prometheus metrics |
 | `METRICS_PATH` | No | `/metrics` | Metrics endpoint path |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | No | - | OTLP gRPC endpoint for distributed tracing (e.g., `http://jaeger:4317`). When unset, tracing exports are disabled and logging is stdout-only. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | No | - | OTLP endpoint for distributed tracing (e.g., `http://jaeger:4317`). When unset, tracing exports are disabled and logging is stdout-only. |
 | `OTEL_SERVICE_NAME` | No | `artifact-keeper` | Service name reported in traces |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | No | `grpc` | Type of exporter for [OpenTelemetry](https://opentelemetry.io/docs/languages/sdk-configuration/otlp-exporter/) (either `grpc` or `http/protobuf`) |
 | `AUDIT_LOG_ENABLED` | No | `true` | Enable audit logging |
 | `AUDIT_LOG_PATH` | No | `/var/log/artifact-keeper/audit.log` | Audit log file path |
 
